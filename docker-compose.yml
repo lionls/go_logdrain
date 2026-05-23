@@ -3,10 +3,14 @@ services:
     build: .
     image: go_logdrain:latest
     container_name: go_logdrain
-    ports:
-      - "${PORT:-4000}:${PORT:-4000}"
+    expose:
+      - "4000"
     environment:
       - PORT=${PORT:-4000}
+      - VIRTUAL_PORT=4000
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
       - VERCEL_WEBHOOK_SECRET=${VERCEL_WEBHOOK_SECRET}
       - LOG_FLUSH_INTERVAL=${LOG_FLUSH_INTERVAL:-15}
       - S3_BUCKET=${S3_BUCKET:-}
@@ -36,6 +40,13 @@ services:
       timeout: 5s
       retries: 3
       start_period: 5s
+    networks:
+      - proxy
+
+networks:
+  proxy:
+    name: proxy
+    external: true
 
 volumes:
   go_logdrain_data:
