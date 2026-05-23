@@ -21,8 +21,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/segmentio/parquet-go"
-	"github.com/segmentio/parquet-go/compress/snappy"
+	"github.com/parquet-go/parquet-go"
+	"github.com/parquet-go/parquet-go/compress/snappy"
 )
 
 type LogEntry struct {
@@ -275,13 +275,10 @@ func (b *LogBuffer) Flush() {
 	}
 
 	buf := new(bytes.Buffer)
-	writer := parquet.NewWriter(buf,
-		parquet.SchemaOf(new(LogEntry)),
+	writer := parquet.NewGenericWriter[LogEntry](buf,
 		parquet.Compression(&snappy.Codec{}),
 	)
-	for _, e := range entries {
-		writer.Write(e)
-	}
+	writer.Write(entries)
 	if err := writer.Close(); err != nil {
 		log.Printf("Parquet write error: %v", err)
 		return
