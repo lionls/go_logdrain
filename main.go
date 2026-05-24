@@ -59,28 +59,28 @@ type LogEntry struct {
 }
 
 type vercelLog struct {
-	ID               string                 `json:"id"`
-	DeploymentID     string                 `json:"deploymentId"`
-	Source           string                 `json:"source"`
-	Host             string                 `json:"host"`
-	Timestamp        int64                  `json:"timestamp"`
-	ProjectID        string                 `json:"projectId"`
-	Level            string                 `json:"level"`
-	Message          json.RawMessage        `json:"message"`
-	ProjectName      string                 `json:"projectName"`
-	BuildID          string                 `json:"buildId"`
-	Type             string                 `json:"type"`
-	Entrypoint       string                 `json:"entrypoint"`
-	RequestID        string                 `json:"requestId"`
-	StatusCode       *int32                 `json:"statusCode"`
-	Path             string                 `json:"path"`
-	ExecutionRegion  string                 `json:"executionRegion"`
-	Environment      string                 `json:"environment"`
-	TraceID          string                 `json:"traceId"`
-	SpanID           string                 `json:"spanId"`
-	TraceDotID       string                 `json:"trace.id"`
-	SpanDotID        string                 `json:"span.id"`
-	Proxy            map[string]interface{} `json:"proxy"`
+	ID              string                 `json:"id"`
+	DeploymentID    string                 `json:"deploymentId"`
+	Source          string                 `json:"source"`
+	Host            string                 `json:"host"`
+	Timestamp       int64                  `json:"timestamp"`
+	ProjectID       string                 `json:"projectId"`
+	Level           string                 `json:"level"`
+	Message         json.RawMessage        `json:"message"`
+	ProjectName     string                 `json:"projectName"`
+	BuildID         string                 `json:"buildId"`
+	Type            string                 `json:"type"`
+	Entrypoint      string                 `json:"entrypoint"`
+	RequestID       string                 `json:"requestId"`
+	StatusCode      *int32                 `json:"statusCode"`
+	Path            string                 `json:"path"`
+	ExecutionRegion string                 `json:"executionRegion"`
+	Environment     string                 `json:"environment"`
+	TraceID         string                 `json:"traceId"`
+	SpanID          string                 `json:"spanId"`
+	TraceDotID      string                 `json:"trace.id"`
+	SpanDotID       string                 `json:"span.id"`
+	Proxy           map[string]interface{} `json:"proxy"`
 }
 
 func optInt32(i *int32) *int32 {
@@ -109,17 +109,22 @@ func normalizeMessage(raw json.RawMessage) string {
 
 	var obj interface{}
 	if err := json.Unmarshal(raw, &obj); err == nil {
-		switch obj.(type) {
+		switch v := obj.(type) {
 		case map[string]interface{}, []interface{}:
-			enc, _ := json.Marshal(obj)
+			enc, _ := json.Marshal(v)
+			return string(enc)
+		case string:
+			var inner interface{}
+			if err := json.Unmarshal([]byte(v), &inner); err == nil {
+				switch inner.(type) {
+				case map[string]interface{}, []interface{}:
+					enc, _ := json.Marshal(inner)
+					return string(enc)
+				}
+			}
+			enc, _ := json.Marshal(map[string]string{"msg": v})
 			return string(enc)
 		}
-	}
-
-	var text string
-	if err := json.Unmarshal(raw, &text); err == nil {
-		enc, _ := json.Marshal(map[string]string{"text": text})
-		return string(enc)
 	}
 
 	return ""
@@ -245,10 +250,10 @@ func toLogEntry(v vercelLog) LogEntry {
 }
 
 type LogBuffer struct {
-	mu       sync.Mutex
-	entries  []LogEntry
-	s3       *s3.Client
-	bucket   string
+	mu      sync.Mutex
+	entries []LogEntry
+	s3      *s3.Client
+	bucket  string
 }
 
 func NewLogBuffer(s3Client *s3.Client, bucket string) *LogBuffer {
@@ -336,7 +341,7 @@ func main() {
 		log.Fatal("VERCEL_WEBHOOK_SECRET must be set")
 	}
 
-	flushInterval := 15 * time.Second
+	flushInterval := 15 * time.Minute
 	if s := os.Getenv("LOG_FLUSH_INTERVAL"); s != "" {
 		if d, err := time.ParseDuration(s + "s"); err == nil {
 			flushInterval = d
