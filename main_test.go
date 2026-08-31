@@ -56,6 +56,16 @@ func TestVerifySignature(t *testing.T) {
 	if verifySignature(secret, body, "") {
 		t.Error("empty signature should fail")
 	}
+
+	tampered := []byte(`[{"id":"42","message":"hello!"}]`)
+	if verifySignature(secret, tampered, sig) {
+		t.Error("tampered payload should fail")
+	}
+
+	wrongSig := computeSig([]byte("wrong_secret"), body)
+	if verifySignature(secret, body, wrongSig) {
+		t.Error("signature computed with wrong secret should fail")
+	}
 }
 
 func TestVercelVerifyHandshake(t *testing.T) {
@@ -98,23 +108,28 @@ func TestVercelVerifyHandshake(t *testing.T) {
 
 func TestNormalizeMessage(t *testing.T) {
 	plain := json.RawMessage(`"Build completed"`)
-	result := normalizeMessage(plain)
-	expected := `{"text":"Build completed"}`
-	if result != expected {
-		t.Errorf("plain text: expected %s, got %s", expected, result)
+	if got := normalizeMessage(plain); got != `{"msg":"Build completed"}` {
+		t.Errorf("plain text: expected %q, got %q", `{"msg":"Build completed"}`, got)
+	}
+
+	withMessage := json.RawMessage(`{"message":"deployed"}`)
+	if got := normalizeMessage(withMessage); got != `{"message":"deployed"}` {
+		t.Errorf("object with message field: expected %q, got %q", `{"message":"deployed"}`, got)
 	}
 
 	jsonMsg := json.RawMessage(`{"status":200}`)
-	result = normalizeMessage(jsonMsg)
-	expected = `{"status":200}`
-	if result != expected {
-		t.Errorf("json: expected %s, got %s", expected, result)
+	if got := normalizeMessage(jsonMsg); got != `{"status":200}` {
+		t.Errorf("json object: expected %q, got %q", `{"status":200}`, got)
 	}
 
 	empty := json.RawMessage(``)
-	result = normalizeMessage(empty)
-	if result != "" {
-		t.Errorf("empty: expected empty, got %s", result)
+	if got := normalizeMessage(empty); got != "" {
+		t.Errorf("empty: expected empty, got %q", got)
+	}
+
+	var absent json.RawMessage
+	if got := normalizeMessage(absent); got != "" {
+		t.Errorf("absent: expected empty, got %q", got)
 	}
 }
 
@@ -131,7 +146,7 @@ func TestLogEntryConversion(t *testing.T) {
 	if entry.Level == nil || *entry.Level != "info" {
 		t.Error("level mismatch")
 	}
-	if entry.Message == nil || *entry.Message != `{"text":"hello"}` {
+	if entry.Message == nil || *entry.Message != `{"msg":"hello"}` {
 		t.Errorf("message mismatch: %v", entry.Message)
 	}
 }
